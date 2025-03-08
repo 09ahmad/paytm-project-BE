@@ -1,23 +1,16 @@
 import express, { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-export const userRouter = express.Router();
+const router = express.Router();
 import cors from "cors";
 import { passwordSchema, usernameSchema } from "../validation";
-import { UserModel } from "../db";
-import dotenv from "dotenv";
-import { router } from ".";
+import { Account, UserModel } from "../db";
 import { JWT_SECRET_KEY } from "../config";
 import { authMiddleware } from "../middleware";
-dotenv.config();
+import { z } from "zod";
 const app = express();
 app.use(express.json());
 app.use(cors());
-app.use("/api/v1", router);
 
-if (!process.env.PORT) {
-  throw new Error("either PORT is undefined or JWT_SECRET is undefined");
-}
-const port = process.env.PORT || 3000;
 router.post("/signup", async (req: Request, res: Response) => {
   try {
     const validateUsername = usernameSchema.safeParse(req.body.username);
@@ -48,6 +41,15 @@ router.post("/signup", async (req: Request, res: Response) => {
       username: username,
       password: password,
     });
+    /// ----- Create new account ------
+
+    const userId = dbUser._id;
+    await Account.create({
+      userId,
+      balance: 1 + Math.random() * 10000,
+    });
+
+    /// -----  ------
     const token = jwt.sign(
       {
         userId: dbUser._id,
@@ -66,7 +68,7 @@ router.post("/signup", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/signin", authMiddleware, async (req: Request, res: Response) => {
+router.post("/signin", async (req: Request, res: Response) => {
   const body = req.body;
   const username = body.username;
   const password = body.password;
@@ -99,8 +101,62 @@ router.post("/signin", authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
-router.post("/update", async (req: Request, res: Response) => {});
-
-app.listen(port, () => {
-  console.log("http://localhost:", port);
+const updateBody = z.object({
+  password: z.string().optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
 });
+
+router.put("/", authMiddleware, async (req: Request, res: Response) => {
+  const { success } = updateBody.safeParse(req.body);
+  if (!success) {
+    res.status(411).json({
+      message: "User validation failded",
+    });
+    return;
+  }
+  try {
+    await UserModel.updateOne({ _id: req.userId }, req.body);
+    res.status(200).json({
+      message: "Updated successfully",
+    });
+  } catch (error) {
+    res.json({
+      message: "Something went wrong while updating the information ",
+    });
+  }
+});
+
+router.get("/bulk", async (req: Request, res: Response) => {
+  const filter = req.query.filter || "";
+  try {
+    const users = await UserModel.find({
+      $or: [
+        {
+          firstName: { $regex: { filter } },
+          lastName: { $regex: { filter } },
+        },
+      ],
+    });
+    if (!users) {
+      res.status(404).json({
+        message: "no user found for the name",
+      });
+      return;
+    }
+    res.json({
+      user: users.map((user) => ({
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        _id: user._id,
+      })),
+    });
+  } catch (error) {
+    res.status(403).json({
+      message: "unable to search",
+    });
+  }
+});
+
+export default router;

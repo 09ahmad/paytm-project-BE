@@ -14,24 +14,30 @@ export const authMiddleware = (
   res: Response,
   next: NextFunction,
 ) => {
-  const token = req.headers.authorization;
-  if (!token || !token.startsWith("Bearer ")) {
-    res.status(403).json({
+  const authHeader = req.headers.authorization;
+  console.log(authHeader)
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+     res.status(403).json({
       error: "Unauthorized",
     });
     return;
   }
+  const token = authHeader.split(" ")[1];
   try {
-    const decode = jwt.verify(token, JWT_SECRET_KEY) as { id: string };
-    if (decode && decode.id) {
-      req.userId = decode.id;
+    const decode = jwt.verify(token, JWT_SECRET_KEY) as { userId: string };
+    if (decode && decode.userId) {
+      req.userId = decode.userId;
       next();
     } else {
-      res.status(403).json({
+       res.status(403).json({
         message: "Invalid token payload",
       });
+      return
     }
   } catch (error) {
-    console.error(error);
+    res.status(403).json({
+      message: "Error in middleware authorization",
+    });
+    return;
   }
 };

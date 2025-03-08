@@ -1,4 +1,4 @@
-import mongoose, { model } from "mongoose";
+import mongoose, { isObjectIdOrHexString, model, SchemaTypes } from "mongoose";
 import { Schema } from "mongoose";
 import dotenv from "dotenv";
 dotenv.config();
@@ -19,19 +19,19 @@ mongoose
 const UserSchema = new Schema({
   firstName: {
     type: String,
-    require: true,
+    required: true,
     trim: true,
     masLength: 20,
   },
   lastName: {
     type: String,
-    require: true,
+    required: true,
     trim: true,
     maxLength: 20,
   },
   username: {
     type: String,
-    require: true,
+    required: true,
     trim: true,
     unique: true,
     minLength: 5,
@@ -39,9 +39,22 @@ const UserSchema = new Schema({
   },
   password: {
     type: String,
-    require: true,
+    required: true,
     minLength: 6,
   },
 });
 
+const AccountSchema = new Schema({
+  userId: {
+    type: Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+  balance: {
+    type: Number,
+    required: true,
+  },
+});
+
 export const UserModel = model("User", UserSchema);
+export const Account = model("Accoun", AccountSchema);
