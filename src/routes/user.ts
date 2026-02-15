@@ -101,6 +101,33 @@ router.post("/signin", async (req: Request, res: Response) => {
   }
 });
 
+// Get current user profile
+router.get("/me", authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const user = await UserModel.findById(req.userId).select("-password");
+    if (!user) {
+      res.status(404).json({
+        message: "User not found",
+      });
+      return;
+    }
+    const account = await Account.findOne({ userId: req.userId });
+    res.status(200).json({
+      user: {
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        username: user.username,
+        balance: account?.balance || 0,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch user profile",
+    });
+  }
+});
+
 const updateBody = z.object({
   password: z.string().optional(),
   firstName: z.string().optional(),
@@ -133,8 +160,10 @@ router.get("/bulk", async (req: Request, res: Response) => {
     const users = await UserModel.find({
       $or: [
         {
-          firstName: { $regex: { filter } },
-          lastName: { $regex: { filter } },
+          firstName: { $regex: filter, $options: "i" },
+        },
+        {
+          lastName: { $regex: filter, $options: "i" },
         },
       ],
     });
